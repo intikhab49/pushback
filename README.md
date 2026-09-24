@@ -1,0 +1,79 @@
+# fixrate
+
+How often do you correct your coding agent, and on what kind of work?
+
+`fixrate` reads your Claude Code transcripts, labels every message you sent
+with Claude, and tells you what share of your messages were corrections,
+broken down by the kind of work in progress (code, writing, media, research,
+ops, meta). A hand-check step tells you how far to trust the labels.
+
+On the author's own 1,633 messages:
+
+| task | messages | corrections | rate | 95% CI |
+|---|---:|---:|---:|---|
+| media | 114 | 49 | 43.0% | 34.3%–52.2% |
+| writing | 429 | 106 | 24.7% | 20.9%–29.0% |
+| research | 188 | 13 | 6.9% | 4.1%–11.5% |
+| code | 340 | 20 | 5.9% | 3.8%–8.9% |
+| meta | 297 | 14 | 4.7% | 2.8%–7.8% |
+| ops | 265 | 12 | 4.5% | 2.6%–7.7% |
+
+Against 91 hand-checked messages the labels had precision 0.97 and recall 0.80.
+That's one person's logs. Run it on yours.
+
+## Run it
+
+```
+pip install -e .
+fixrate extract            # reads ~/.claude/projects, writes ./fixrate-data/
+fixrate label              # sends your messages to Claude, resumable
+fixrate audit              # hand-check 40 messages
+fixrate report --markdown  # the table, with the audit folded in
+```
+
+`label` uses the Anthropic SDK, so it picks up `ANTHROPIC_API_KEY` or an
+`ant auth login` profile. It defaults to `claude-opus-5` at low effort. Change
+it with `--model`. To send through a gateway, set `ANTHROPIC_BASE_URL`.
+
+## What counts as a correction
+
+A message where you reject, fix or redirect something the agent just did,
+said, wrote or proposed. New tasks, answers to its questions, picking between
+its options, approvals and pasted logs don't count. The full rubric is in
+`src/fixrate/prompt.py`. If you change it, run `audit` again.
+
+Rejected tool calls and interrupts carry no text, so they're counted
+separately and bucketed by the action you stopped (a code edit, a shell
+command, and so on).
+
+## Privacy
+
+- `extract` and `report` never leave your machine. `report` prints counts only.
+- `label` sends each message, plus the end of the agent reply before it, to the
+  model provider. If your logs contain client work, check that provider's data
+  policy first. `label` asks before it sends anything.
+- `fixrate-data/` holds your raw messages. It's in `.gitignore`. Keep it there.
+
+## Your history is shorter than you think
+
+Claude Code deletes transcripts older than 30 days by default. To keep more,
+set `cleanupPeriodDays` in `~/.claude/settings.json`, for example
+`"cleanupPeriodDays": 365`. It only affects transcripts that still exist.
+
+## How the numbers are computed
+
+- Rates per task come with Wilson 95% intervals.
+- `audit` samples half from messages the model flagged and half from the rest.
+  The report estimates the true count as
+  `flagged × precision + unflagged × miss rate`, with a range built from both
+  strata's intervals.
+- A batch that fails stays unlabelled and is retried on the next run. It's
+  never counted as "not a correction".
+
+## Limits
+
+- Claude Code transcripts only, for now.
+- Task type is judged from the last agent reply and your message, not the whole session.
+- The rubric was tuned on one person's logs.
+
+MIT licensed.
