@@ -337,3 +337,9 @@ def test_rules_cli_round_trip_without_api(tmp_path, capsys):
     md = (d / "rules.md").read_text(encoding="utf-8")
     assert "Keep posts under 80 words" in md and "s:1, s:3, s:5" in md
     assert "1 rules (1 you already have" in capsys.readouterr().out
+
+
+def test_rules_render_shortens_session_ids():
+    found = [{"rule": "A", "why": "w", "task": "ops", "support": 3,
+              "ids": ["163f3d4c-f8a2-4634-8a4a-e36b914c0d0e:18"], "covered_by": ""}]
+    assert "Evidence: 163f3d4c:18" in rules.render(found, 3)

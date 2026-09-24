@@ -120,6 +120,12 @@ def ask(client, request: dict) -> dict:
     return json.loads(text)
 
 
+def _short(message_id: str) -> str:
+    """session-uuid:12 -> first 8 chars of the session, which is enough to find it."""
+    session, _, n = message_id.rpartition(":")
+    return f"{session[:8]}:{n}"
+
+
 def render(rules: list[dict], n_corrections: int) -> str:
     broken = [r for r in rules if r["covered_by"]]
     new = [r for r in rules if not r["covered_by"]]
@@ -136,7 +142,8 @@ def render(rules: list[dict], n_corrections: int) -> str:
             out.append(f"  {r['why']} ({r['task']}, {r['support']} corrections)")
             if r["covered_by"]:
                 out.append(f"  You already have: \"{r['covered_by']}\"")
-            out.append(f"  Evidence: {', '.join(r['ids'][:8])}" + (" …" if len(r["ids"]) > 8 else ""))
+            shown = [_short(i) for i in r["ids"][:8]]
+            out.append(f"  Evidence: {', '.join(shown)}" + (" …" if len(r["ids"]) > 8 else ""))
 
     block("Rules you already have that keep getting broken",
           "A rule that exists and still gets corrected isn't working. Make it more specific, "
