@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import anthropic
 
-from .prompt import CTYPES, SCHEMA, SYSTEM, TASKS
+from .prompt import CTYPES, SCHEMA, SYSTEM, TASKS, TOPICS
 
 DEFAULT_MODEL = "claude-opus-5"
 
@@ -49,7 +49,9 @@ def validate(raw: list[dict], keys: list[str]) -> list[dict]:
         if not d["correction"]:
             d["ctype"] = "none"
         seen.add(i)
-        good.append({"id": keys[i], **{k: d[k] for k in ("task", "correction", "ctype", "conf") if k in d}})
+        if d.get("topic") not in TOPICS[d["task"]]:
+            d["topic"] = "other"  # a topic from another task's list, or none at all
+        good.append({"id": keys[i], **{k: d[k] for k in ("task", "topic", "correction", "ctype", "conf") if k in d}})
     return good
 
 

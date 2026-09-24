@@ -362,3 +362,29 @@ def test_report_usage_share_and_corrected_again():
     assert r["rows"][0]["task"] == "writing"  # sorted by use
     text = report.render(r)
     assert "1 of 2 corrections (50%)" in text and "| code | 1 | 20% | 1 | 100.0% |" in text
+
+
+def test_validate_keeps_topic_and_rejects_foreign_topics():
+    raw = [{"id": 0, "task": "code", "topic": "cli-tool", "correction": True, "ctype": "code", "conf": "high"},
+           {"id": 1, "task": "code", "topic": "social-post", "correction": False, "ctype": "none", "conf": "high"},
+           {"id": 2, "task": "ops", "correction": False, "ctype": "none", "conf": "high"}]
+    out = label.validate(raw, ["s:0", "s:1", "s:2"])
+    assert [d["topic"] for d in out] == ["cli-tool", "other", "other"]
+
+
+def test_report_lists_most_corrected_topics():
+    labels = {f"s:{i}": {"task": "code", "topic": "cli-tool", "correction": i in (0, 2, 4), "ctype": "code"}
+              for i in range(6)}
+    labels.update({f"t:{i}": {"task": "writing", "topic": "social-post", "correction": i == 0, "ctype": "tone_style"}
+                   for i in range(5)})
+    labels["u:0"] = {"task": "media", "topic": "image", "correction": True, "ctype": "tone_style"}  # under 5 messages
+    r = report.build(labels)
+    assert [(t["topic"], t["corrections"]) for t in r["topics"]] == [("cli-tool", 3), ("social-post", 1)]
+    text = report.render(r)
+    assert "| code / cli-tool | 6 | 3 | 50% |" in text and "image" not in text.split("Most corrected")[1]
+
+
+def test_prompt_topics_are_in_schema_and_system():
+    from pushback import prompt
+    assert "cli-tool" in prompt.SYSTEM and "cli-tool" in prompt.ALL_TOPICS
+    assert all("other" in ts for ts in prompt.TOPICS.values())

@@ -52,7 +52,20 @@ The author's own 1,633 messages to Claude Code:
 | research | 188 | 12% | 13 | 6.9% | 4.1%–11.5% | 8% (1/13) |
 | media | 114 | 7% | 49 | 43.0% | 34.3%–52.2% | 44% (20/45) |
 
-- Against 91 hand-checked messages the labels had **precision 0.97 and recall 0.80**.
+Most corrected topics (at least 5 messages each):
+
+| topic | messages | corrections | rate | corrected again |
+|---|---:|---:|---:|---:|
+| writing / social-post | 135 | 47 | 35% | 23/45 |
+| writing / client-message | 144 | 26 | 18% | 7/23 |
+| media / image | 47 | 24 | 51% | 10/21 |
+| media / video | 36 | 12 | 33% | 6/12 |
+| writing / proposal-report | 26 | 11 | 42% | 5/11 |
+| writing / video-script | 36 | 10 | 28% | 3/9 |
+| code / frontend | 31 | 6 | 19% | 1/6 |
+| code / debugging | 27 | 5 | 19% | 1/4 |
+
+- Against 91 hand-checked messages the correction labels had **precision 0.97 and recall 0.80**. Topic labels were spot-checked, not audited.
 - **1 in 3 corrections needed a second one.** 70 of 201 fixes got corrected again (35%), 41% on writing and 44% on images.
 - **3 rules the author had already written kept getting broken**, with 6 to 8 corrections each.
 
@@ -86,7 +99,7 @@ it with `--model`. To send through a gateway, set `ANTHROPIC_BASE_URL`.
 | `extract` | pulls the messages you typed, plus full agent turns, out of transcripts | no |
 | `label` | tags each message with a task type and whether it's a correction | yes, to the model provider, after asking |
 | `audit` | shows you a stratified sample to judge by hand | no |
-| `report` | what you use the agent for, how often you correct it per task, how often a fix gets corrected again, with 95% intervals | no |
+| `report` | what you use the agent for, how often you correct it per task and per topic (frontend, cli-tool, social-post, ...), how often a fix gets corrected again, with 95% intervals | no |
 | `rules` | groups recurring corrections into CLAUDE.md rules | yes, or no with `--prompt-file` |
 | `export` | writes preference pairs as JSONL, with secrets scrubbed | no |
 
@@ -95,6 +108,21 @@ it with `--model`. To send through a gateway, set `ANTHROPIC_BASE_URL`.
 <p align="center">
   <img src="assets/pipeline.svg" width="100%" alt="How pushback works: extract messages from Claude Code transcripts, label them, audit a sample, then report correction rates, draft CLAUDE.md rules, or export preference pairs">
 </p>
+
+Every message gets a **task** (code, writing, media, research, ops, meta) and a
+**topic** from a fixed list for that task, so results stay comparable between
+people:
+
+| task | topics |
+|---|---|
+| code | frontend, backend-api, cli-tool, database, tests, auth-security, integrations, data-ml, scripts-automation, agent-prompts, debugging, pr-workflow |
+| writing | social-post, client-message, email, docs-readme, video-script, proposal-report, spec-plan |
+| media | image, video, diagram, ui-design |
+| research | benchmark-experiment, data-analysis, market-leads, paper-reading, trading-analysis |
+| ops | deploy-hosting, git-github, accounts-credentials, config-settings, browser-automation, ci |
+| meta | planning, memory-context, advice, status-check |
+
+Anything that fits none of them is `other`.
 
 A **correction** is a message where you reject, fix or redirect something the
 agent just did, said, wrote or proposed. New tasks, answers to its questions,

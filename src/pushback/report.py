@@ -13,21 +13,30 @@ def _next_id(message_id: str) -> str:
     return f"{session}:{int(n) + 1}"
 
 
-def build(labels: dict[str, dict], audit: dict[str, dict] | None = None, silent: dict | None = None) -> dict:
+def build(labels: dict[str, dict], audit: dict[str, dict] | None = None, silent: dict | None = None,
+          top_topics: int = 10, min_topic_messages: int = 5) -> dict:
     total = Counter(d["task"] for d in labels.values())
     corr = Counter(d["task"] for d in labels.values() if d["correction"])
     ctypes = defaultdict(Counter)
     # Corrected again: your very next message corrected the agent's fix too.
     # Only corrections followed by a labelled message count, so a session that ends on a correction isn't a success.
     again, again_base = Counter(), Counter()
+    topic_n, topic_k, topic_again, topic_base = Counter(), Counter(), Counter(), Counter()
+    for d in labels.values():
+        if d.get("topic"):
+            topic_n[(d["task"], d["topic"])] += 1
     for mid, d in labels.items():
         if not d["correction"]:
             continue
+        key = (d["task"], d.get("topic"))
+        topic_k[key] += 1
         ctypes[d["task"]][d["ctype"]] += 1
         nxt = labels.get(_next_id(mid))
         if nxt is not None:
             again_base[d["task"]] += 1
             again[d["task"]] += bool(nxt["correction"])
+            topic_base[key] += 1
+            topic_again[key] += bool(nxt["correction"])
 
     rows = []
     for task in TASKS:
@@ -41,7 +50,12 @@ def build(labels: dict[str, dict], audit: dict[str, dict] | None = None, silent:
     rows.sort(key=lambda r: r["messages"], reverse=True)  # what you use the agent for most comes first
 
     flagged = sum(corr.values())
-    out = {"messages": len(labels), "flagged": flagged, "rows": rows, "audit": None,
+    topics = [{"task": t, "topic": tp, "messages": n, "corrections": topic_k[(t, tp)], "rate": topic_k[(t, tp)] / n,
+               "again": topic_again[(t, tp)], "again_base": topic_base[(t, tp)]}
+              for (t, tp), n in topic_n.items() if topic_k[(t, tp)] and n >= min_topic_messages]
+    topics.sort(key=lambda x: (x["corrections"], x["rate"]), reverse=True)
+
+    out = {"messages": len(labels), "flagged": flagged, "rows": rows, "topics": topics[:top_topics], "audit": None,
            "again": sum(again.values()), "again_base": sum(again_base.values()), "silent": silent or {}}
 
     if audit:
@@ -74,6 +88,16 @@ def render(r: dict) -> str:
         lines.append("")
         lines.append(f"Corrected again: {r['again']} of {r['again_base']} corrections "
                      f"({r['again'] / r['again_base']:.0%}) were followed by another correction of the fix.")
+
+    if r.get("topics"):
+        lines.append("")
+        lines.append("Most corrected topics (at least 5 messages each):")
+        lines.append("")
+        lines.append("| topic | messages | corrections | rate | corrected again |")
+        lines.append("|---|---:|---:|---:|---:|")
+        for t in r["topics"]:
+            again = f"{t['again']}/{t['again_base']}" if t["again_base"] else "-"
+            lines.append(f"| {t['task']} / {t['topic']} | {t['messages']} | {t['corrections']} | {t['rate']:.0%} | {again} |")
 
     a = r["audit"]
     lines.append("")

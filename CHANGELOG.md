@@ -2,6 +2,7 @@
 
 ## 0.1.1 (2026-09-24)
 
+- Labels now include a **topic**: the specific kind of work, from a fixed list per task (for example code: frontend, cli-tool, database, tests; writing: social-post, client-message, docs-readme). `report` lists your most corrected topics.
 - `report` now shows each task's share of your messages and a **corrected again** column: how often your very next message corrected the agent's fix too. Rows are sorted by use.
 - Corrections that end a session are left out of the corrected-again denominator instead of counting as accepted.
 
