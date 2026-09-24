@@ -1,0 +1,14 @@
+name: Feature request
+description: A new transcript format, command or measurement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to measure or do?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How you'd expect it to work

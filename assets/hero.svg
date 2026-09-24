@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-label="pushback: measure how often you correct your AI coding agent, find the rules it keeps breaking, and export your corrections as preference pairs."><title>pushback: measure how often you correct your AI coding agent, find the rules it keeps breaking, and export your corrections as preference pairs.</title><style>
+.sans{font-family:'Segoe UI', Inter, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;} .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;letter-spacing:1.2px;}
+.blob{animation:float 14s ease-in-out infinite alternate;}
+.b2{animation-duration:18s;animation-direction:alternate-reverse;} .b3{animation-duration:22s;}
+@keyframes float{from{transform:translate(0,0) scale(1);} to{transform:translate(60px,-40px) scale(1.15);}}
+.pulse{animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.25;}}
+.rot{opacity:0;animation:rot 12s infinite both;}
+@keyframes rot{0%{opacity:0;transform:translateY(16px);} 4%,29%{opacity:1;transform:translateY(0);} 33%,100%{opacity:0;transform:translateY(-16px);}}
+.move{animation:move 2.6s linear infinite;}
+@keyframes move{from{transform:translateX(0);opacity:0;} 15%{opacity:1;} 85%{opacity:1;} to{transform:translateX(var(--dx,120px));opacity:0;}}
+.shine{animation:shine 6s linear infinite;}
+@keyframes shine{from{transform:translateX(-400px);} to{transform:translateX(1400px);}}
+.enter{animation:enter .9s cubic-bezier(.2,.8,.2,1) both;}
+@keyframes enter{from{transform:translateY(-14px);opacity:0;} to{transform:translateY(0);opacity:1;}}
+.growx{animation:growx 1.4s cubic-bezier(.2,.8,.2,1) both;transform-box:fill-box;transform-origin:left;}
+@keyframes growx{from{transform:scaleX(0);} to{transform:scaleX(1);}}
+.type{animation:type 7s steps(1) infinite both;}
+@keyframes type{0%{opacity:0;} 18%,100%{opacity:1;}}
+.t2{animation-name:type2;} @keyframes type2{0%{opacity:0;} 42%,100%{opacity:1;}}
+.t3{animation-name:type3;} @keyframes type3{0%{opacity:0;} 66%,100%{opacity:1;}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;} .rot{opacity:0;} .r0{opacity:1;}}
+</style><defs>
+<linearGradient id="sun" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFB224"/><stop offset=".5" stop-color="#FF5C39"/><stop offset="1" stop-color="#FF3D9A"/></linearGradient>
+<linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB224" stop-opacity=".9"/><stop offset=".5" stop-color="#FF3D9A" stop-opacity=".35"/><stop offset="1" stop-color="#5B8CFF" stop-opacity=".8"/></linearGradient>
+<filter id="blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="46"/></filter>
+<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1.1" fill="#26263D"/></pattern>
+</defs><clipPath id="clip"><rect width="1200" height="440" rx="20"/></clipPath><g clip-path="url(#clip)"><rect width="1200" height="440" fill="#0A0A14"/><g filter="url(#blur)" opacity=".5"><circle class="blob" cx="144" cy="88" r="141" fill="#FF5C39"/><circle class="blob b2" cx="960" cy="374" r="132" fill="#5B8CFF"/><circle class="blob b3" cx="660" cy="44" r="97" fill="#FF3D9A"/></g><rect width="1200" height="440" fill="url(#dots)" opacity=".6"/>
+<rect x="64" y="52" width="290" height="30" rx="15" fill="#12121F" stroke="#A3F547" stroke-opacity=".6"/>
+<circle class="pulse" cx="84" cy="67" r="5" fill="#A3F547" filter="url(#glow)"/>
+<text x="98" y="71.5" class="mono" font-size="11" fill="#A3F547">OPEN SOURCE · PIP INSTALL PUSHBACK</text>
+<text x="58" y="176" class="sans" font-size="104" font-weight="800" letter-spacing="-4" fill="url(#sun)" filter="url(#glow)">pushback</text>
+<text class="sans rot r0" style="animation-delay:0s" x="64" y="238" font-size="30" font-weight="700" fill="#F6F4FF">How often do you <tspan fill="#FF5C39">correct your coding agent?</tspan></text><text class="sans rot" style="animation-delay:4s" x="64" y="238" font-size="30" font-weight="700" fill="#F6F4FF">Which of your rules <tspan fill="#FF3D9A">does it keep breaking?</tspan></text><text class="sans rot" style="animation-delay:8s" x="64" y="238" font-size="30" font-weight="700" fill="#F6F4FF">Where does it need <tspan fill="#A3F547">a second correction?</tspan></text>
+<rect x="64" y="282" width="107" height="26" rx="13" fill="#12121F" stroke="#FF5C39" stroke-opacity=".55"/><text x="77" y="299.5" class="mono" font-size="11" fill="#FF5C39">CLAUDE CODE</text><rect x="181.4" y="282" width="137" height="26" rx="13" fill="#12121F" stroke="#FFB224" stroke-opacity=".55"/><text x="194.4" y="299.5" class="mono" font-size="11" fill="#FFB224">CORRECTION RATE</text><rect x="328.4" y="282" width="137" height="26" rx="13" fill="#12121F" stroke="#A3F547" stroke-opacity=".55"/><text x="341.4" y="299.5" class="mono" font-size="11" fill="#A3F547">CLAUDE.MD RULES</text>
+<rect x="64" y="318" width="144" height="26" rx="13" fill="#12121F" stroke="#FF3D9A" stroke-opacity=".55"/><text x="77" y="335.5" class="mono" font-size="11" fill="#FF3D9A">PREFERENCE PAIRS</text><rect x="218.4" y="318" width="100" height="26" rx="13" fill="#12121F" stroke="#5B8CFF" stroke-opacity=".55"/><text x="231.4" y="335.5" class="mono" font-size="11" fill="#5B8CFF">HAND AUDIT</text><rect x="328.4" y="318" width="115" height="26" rx="13" fill="#12121F" stroke="#B794FF" stroke-opacity=".55"/><text x="341.4" y="335.5" class="mono" font-size="11" fill="#B794FF">RUNS LOCALLY</text>
+<line x1="64" y1="372" x2="640" y2="372" stroke="#26263D"/>
+<text x="64" y="402" class="mono" font-size="12" fill="#A3A1BE">EXTRACT · LABEL · AUDIT · REPORT · RULES · EXPORT</text>
+<g class="type"><rect x="720" y="58" width="420" height="74" rx="14" fill="#12121F" stroke="#5B8CFF" stroke-opacity=".6"/><text x="738" y="80" class="mono" font-size="10" fill="#5B8CFF">AGENT</text><text x="738" y="104" class="sans" font-size="15" fill="#F6F4FF">Here's the post. It opens with context,</text><text x="738" y="124" class="sans" font-size="15" fill="#F6F4FF">then the result lands at the end.</text></g><g class="type t2"><rect x="760" y="158" width="380" height="74" rx="14" fill="#12121F" stroke="#FF5C39" stroke-opacity=".6"/><text x="778" y="180" class="mono" font-size="10" fill="#FF5C39">YOU · PUSHBACK</text><text x="778" y="204" class="sans" font-size="15" fill="#F6F4FF">no, the last line is the hook.</text><text x="778" y="224" class="sans" font-size="15" fill="#F6F4FF">put it first.</text></g><g class="type t3"><rect x="720" y="258" width="420" height="74" rx="14" fill="#12121F" stroke="#A3F547" stroke-opacity=".6"/><text x="738" y="280" class="mono" font-size="10" fill="#A3F547">PUSHBACK RULES</text><text x="738" y="304" class="sans" font-size="15" fill="#F6F4FF">Put the strongest line first.</text><text x="738" y="324" class="sans" font-size="15" fill="#F6F4FF">3 corrections · rule drafted</text></g>
+<rect class="shine" x="0" y="0" width="120" height="440" fill="#fff" opacity=".035" transform="skewX(-20)"/></g><rect x="1" y="1" width="1198" height="438" rx="19" fill="none" stroke="url(#edge)" stroke-width="1.5"/></svg>

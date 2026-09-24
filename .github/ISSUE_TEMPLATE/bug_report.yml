@@ -1,0 +1,30 @@
+name: Bug report
+description: Something in pushback gave a wrong result or crashed
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Please don't paste transcript text, API keys or labels that contain your messages. Counts and error messages are enough."
+  - type: input
+    id: command
+    attributes:
+      label: Command you ran
+      placeholder: pushback report --markdown
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Error output
+      render: shell
+  - type: input
+    id: env
+    attributes:
+      label: pushback version, Python version, OS
+      placeholder: 0.1.0 / 3.12 / Windows 11
