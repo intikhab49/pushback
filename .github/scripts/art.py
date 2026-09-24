@@ -160,10 +160,10 @@ def rates():
 <text x="64" y="90" class="mono" font-size="12" fill="{MUTED}">1,633 MESSAGES · ONE DEVELOPER · BARS = RATE · WHISKERS = 95% CI</text>
 {ticks}{''.join(rows)}
 {stat(860, 118, "1 in 3", CORAL, "corrections needed a second one:", "70 of 201 fixes got corrected again")}
-{stat(860, 256, "3 rules", LIME, "already written, still broken:", "6 to 8 corrections each")}
+{stat(860, 256, "3 more", LIME, "times a written rule got broken:", "images must not look AI-generated")}
 <text x="64" y="{H - 30}" class="sans" font-size="14" fill="{MUTED}">These rates describe a workflow, not a model: the code work ran through skills, references, memory, plans and CI first. Writing didn't.</text>"""
     return svg(W, H, "Correction rate by task on the author's 1,633 messages: media 43.0%, writing 24.7%, research 6.9%, "
-                     "code 5.9%, meta 4.7%, ops 4.5%. One in three corrections needed a second correction.", body)
+                     "code 5.9%, meta 4.7%, ops 4.5%. One in three corrections needed a second correction. One written rule was broken 3 more times.", body)
 
 
 # ---------------------------------------------------------------- pipeline

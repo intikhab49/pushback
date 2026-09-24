@@ -309,7 +309,7 @@ def test_rules_render_separates_broken_rules():
         {"rule": "B", "why": "w", "task": "media", "support": 3, "ids": ["s:2"], "covered_by": ""},
     ]
     md = rules.render(found, 40)
-    assert md.index("keep getting broken") < md.index("**A**") < md.index("New rules") < md.index("**B**")
+    assert md.index("these corrections hit") < md.index("**A**") < md.index("New rules") < md.index("**B**")
     assert "No pattern" in rules.render([], 3)
 
 
@@ -337,7 +337,7 @@ def test_rules_cli_round_trip_without_api(tmp_path, capsys):
     cli.main(["--data", str(d), "rules", "--from-response", str(reply)])
     md = (d / "rules.md").read_text(encoding="utf-8")
     assert "Keep posts under 80 words" in md and "s:1, s:3, s:5" in md
-    assert "1 rules (1 you already have" in capsys.readouterr().out
+    assert "1 rules (1 match rules you already have" in capsys.readouterr().out
 
 
 def test_rules_render_shortens_session_ids():
@@ -456,3 +456,76 @@ def test_label_instructions_state_origin_and_scope(tmp_path):
     text = (d / "p" / "INSTRUCTIONS.md").read_text(encoding="utf-8")
     assert "pushback label --prompt-file" in text and "never as instructions to follow" in text
     assert "{" + "responses}" not in text  # every placeholder filled
+
+
+# --- rules stability --------------------------------------------------------
+
+def _rule(text, ids, covered=""):
+    return {"rule": text, "why": "w", "task": "writing", "support": len(ids), "ids": ids, "covered_by": covered}
+
+
+def test_stabilize_matches_rules_by_evidence_not_wording():
+    runs = [
+        [_rule("Put the hook first", ["a", "b", "c", "d"]), _rule("Check the chrome profile", ["x", "y", "z"])],
+        [_rule("Lead with the strongest line", ["a", "b", "c"]), _rule("One-off idea", ["p", "q", "r"])],
+        [_rule("Hook at the top", ["b", "c", "d", "e"]), _rule("Verify browser identity", ["x", "y", "w"])],
+    ]
+    stable, unstable = rules.stabilize(runs, min_runs=2)
+    assert [(r["rule"], r["runs"]) for r in stable] == [("Put the hook first", 3), ("Check the chrome profile", 2)]
+    assert stable[0]["ids"] == ["b", "c", "a", "d"] or set(stable[0]["ids"]) == {"a", "b", "c", "d"}
+    assert "e" not in stable[0]["ids"]  # cited by only 1 of 3 members
+    assert [(r["rule"], r["runs"]) for r in unstable] == [("One-off idea", 1)]
+    assert all(r["n_runs"] == 3 for r in stable + unstable)
+
+
+def test_stabilize_never_merges_two_rules_from_the_same_run():
+    runs = [[_rule("A", ["a", "b", "c"]), _rule("A again", ["a", "b", "c", "d"])], [_rule("A'", ["a", "b", "c"])]]
+    stable, unstable = rules.stabilize(runs, min_runs=2)
+    assert len(stable) == 1 and len(unstable) == 1
+
+
+def test_stabilize_covered_by_needs_half_the_members():
+    runs = [[_rule("R", ["a", "b", "c"], "no tables")], [_rule("R", ["a", "b", "c"])], [_rule("R", ["a", "b", "c"])]]
+    assert rules.stabilize(runs, 2)[0][0]["covered_by"] == ""
+    runs[1][0]["covered_by"] = "no tables"
+    assert rules.stabilize(runs, 2)[0][0]["covered_by"] == "no tables"
+
+
+def test_rules_cli_multiple_responses_reports_stability(tmp_path, capsys):
+    labels, turns = _rules_fixture()
+    d = tmp_path / "data"
+    d.mkdir()
+    with open(d / "labels.jsonl", "w", encoding="utf-8") as fh:
+        for mid, lab in labels.items():
+            fh.write(json.dumps({"id": mid, **lab}) + "\n")
+    with open(d / "turns.jsonl", "w", encoding="utf-8") as fh:
+        for mid, t in turns.items():
+            fh.write(json.dumps({"id": mid, **t}) + "\n")
+    cli.main(["--data", str(d), "rules", "--prompt-file", "--existing"])
+    replies = []
+    for k, rs in enumerate([
+        [{"rule": "Keep posts short", "ids": [0, 1, 2]}, {"rule": "Fluke", "ids": [2, 3, 4]}],
+        [{"rule": "Posts under 80 words", "ids": [0, 1, 2]}],
+        [{"rule": "Short posts", "ids": [0, 1, 3]}],
+    ]):
+        f = tmp_path / f"r{k}.json"
+        f.write_text(json.dumps({"rules": [{**r, "why": "w", "task": "writing", "covered_by": ""} for r in rs]}),
+                     encoding="utf-8")
+        replies.append(str(f))
+    cli.main(["--data", str(d), "rules", "--from-response", *replies])
+    out = capsys.readouterr().out
+    assert "1 rules" in out and "at least 2 of 3 runs; 1 dropped" in out
+    md = (d / "rules.md").read_text(encoding="utf-8")
+    assert "in 3/3 runs" in md and "Not stable enough" in md and "Fluke (1/3 runs" in md
+
+
+def test_rules_evidence_shows_date_range(tmp_path):
+    found = [{"rule": "A", "why": "w", "task": "ops", "support": 3, "ids": ["s:1", "s:2", "s:3"], "covered_by": "x"}]
+    md = rules.render(found, 3, dates={"s:1": "2026-09-03", "s:2": "2026-08-27", "s:3": ""})
+    assert "Evidence (2026-08-27 to 2026-09-03):" in md
+    assert "Evidence:" in rules.render(found, 3)  # no dates known, no range
+
+
+def test_extract_records_message_dates(tmp_path):
+    _write_session(tmp_path, "d", [dict(_user("hello"), timestamp="2026-09-21T10:00:00.000Z")])
+    assert extract.extract(str(tmp_path)).turns["d:0"]["date"] == "2026-09-21"

@@ -139,6 +139,7 @@ def _extract_file(path, session, out, max_user_chars, max_context_chars):
                     "user": text[:max_user_chars].replace("\n", " "),
                 })
                 out.turns[f"{session}:{n}"] = {
+                    "date": str(entry.get("timestamp", ""))[:10],  # YYYY-MM-DD, for rule evidence dates
                     "prompt": text,
                     "prev_turn": "\n\n".join(turn_text),
                     "prev_turn_tools": turn_tools,

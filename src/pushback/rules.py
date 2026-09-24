@@ -66,6 +66,7 @@ def collect(labels: dict[str, dict], turns: dict[str, dict], tasks=None, ctypes=
             "task": lab["task"],
             "agent": turn.get("prev_turn", "")[-AGENT_CHARS:],
             "correction": turn.get("prompt", "")[:CORRECTION_CHARS],
+            "date": turn.get("date", ""),
         })
     items.sort(key=lambda x: (x["id"].rpartition(":")[0], int(x["id"].rpartition(":")[2])))
     return items[-limit:]
@@ -120,18 +121,69 @@ def ask(client, request: dict) -> dict:
     return json.loads(text)
 
 
+def stabilize(runs: list[list[dict]], min_runs: int, min_overlap: float = 0.5) -> tuple[list[dict], list[dict]]:
+    """Group the same rule across several runs, and keep only the rules that keep coming back.
+
+    Rules are matched by their evidence, not their wording: two rules from different runs are the
+    same rule when their cited corrections overlap by at least `min_overlap` (the share of the
+    smaller set). A cluster takes at most one rule per run. Its text comes from its best-supported
+    member; its evidence is the corrections cited by at least half of its members.
+    Returns (stable, unstable), each rule annotated with how many runs it appeared in.
+    """
+    clusters: list[dict] = []
+    members = sorted(((ri, r) for ri, rs in enumerate(runs) for r in rs), key=lambda x: -x[1]["support"])
+    for ri, r in members:
+        ids = set(r["ids"])
+        best, best_overlap = None, 0.0
+        for c in clusters:
+            if ri in c["runs"]:
+                continue
+            overlap = len(ids & c["ids"]) / min(len(ids), len(c["ids"]))
+            if overlap >= min_overlap and overlap > best_overlap:
+                best, best_overlap = c, overlap
+        if best is None:
+            clusters.append({"runs": {ri}, "ids": set(ids), "rules": [r]})
+        else:
+            best["runs"].add(ri)
+            best["ids"] |= ids
+            best["rules"].append(r)
+
+    stable, unstable = [], []
+    for c in clusters:
+        rep = max(c["rules"], key=lambda r: r["support"])
+        counts: dict[str, int] = {}
+        for r in c["rules"]:
+            for i in r["ids"]:
+                counts[i] = counts.get(i, 0) + 1
+        need = (len(c["rules"]) + 1) // 2
+        core = [i for i, k in sorted(counts.items(), key=lambda kv: -kv[1]) if k >= need]
+        covered = [r["covered_by"] for r in c["rules"] if r["covered_by"]]
+        out = {**rep, "ids": core, "support": len(core), "runs": len(c["runs"]), "n_runs": len(runs),
+               "covered_by": covered[0] if len(covered) * 2 >= len(c["rules"]) else ""}
+        (stable if out["runs"] >= min_runs else unstable).append(out)
+    stable.sort(key=lambda r: (r["runs"], r["support"]), reverse=True)
+    unstable.sort(key=lambda r: (r["runs"], r["support"]), reverse=True)
+    return stable, unstable
+
+
 def _short(message_id: str) -> str:
     """session-uuid:12 -> first 8 chars of the session, which is enough to find it."""
     session, _, n = message_id.rpartition(":")
     return f"{session[:8]}:{n}"
 
 
-def render(rules: list[dict], n_corrections: int) -> str:
+def render(rules: list[dict], n_corrections: int, unstable: list[dict] | None = None,
+           dates: dict[str, str] | None = None) -> str:
     broken = [r for r in rules if r["covered_by"]]
     new = [r for r in rules if not r["covered_by"]]
     out = [f"# Rules from {n_corrections} corrections", ""]
     out.append("Each rule is backed by at least the number of corrections shown. Read the evidence ids "
                "in your own data before adopting a rule; the model drafted these, you decide.")
+    n_runs = rules[0]["n_runs"] if rules and "n_runs" in rules[0] else (unstable[0]["n_runs"] if unstable else 1)
+    if n_runs > 1:
+        out.append("")
+        out.append(f"Asked {n_runs} times. Only rules that came back in several runs, citing mostly the same "
+                   "corrections, are kept; the rest are listed at the end.")
 
     def block(title, note, group):
         if not group:
@@ -139,16 +191,25 @@ def render(rules: list[dict], n_corrections: int) -> str:
         out.extend(["", f"## {title}", "", note, ""])
         for r in group:
             out.append(f"- **{r['rule']}**  ")
-            out.append(f"  {r['why']} ({r['task']}, {r['support']} corrections)")
+            runs = f", in {r['runs']}/{r['n_runs']} runs" if r.get("n_runs", 1) > 1 else ""
+            out.append(f"  {r['why']} ({r['task']}, {r['support']} corrections{runs})")
             if r["covered_by"]:
                 out.append(f"  You already have: \"{r['covered_by']}\"")
             shown = [_short(i) for i in r["ids"][:8]]
-            out.append(f"  Evidence: {', '.join(shown)}" + (" …" if len(r["ids"]) > 8 else ""))
+            when = sorted(dates[i] for i in r["ids"] if dates and dates.get(i))
+            span = f" ({when[0]} to {when[-1]})" if when else ""
+            out.append(f"  Evidence{span}: {', '.join(shown)}" + (" …" if len(r["ids"]) > 8 else ""))
 
-    block("Rules you already have that keep getting broken",
-          "A rule that exists and still gets corrected isn't working. Make it more specific, "
-          "move it somewhere the agent reads at the right moment, or turn it into a check.", broken)
+    block("Rules you already have that these corrections hit",
+          "If these corrections happened after you wrote the rule, the rule isn't working: make it more specific, "
+          "move it somewhere the agent reads at the right moment, or turn it into a check. If you wrote the rule "
+          "after them, it may already be doing its job; check the evidence dates.", broken)
     block("New rules to consider", "Recurring corrections with no rule behind them yet.", new)
+    if unstable:
+        out.extend(["", "## Not stable enough to keep", "",
+                    "These showed up in too few runs. They may still be real; they're just not reliable yet.", ""])
+        for r in unstable:
+            out.append(f"- {r['rule']} ({r['runs']}/{r['n_runs']} runs, {r['support']} corrections)")
     if not rules:
         out.extend(["", "No pattern reached the minimum support. Try more data or a lower --min-support."])
     return "\n".join(out) + "\n"

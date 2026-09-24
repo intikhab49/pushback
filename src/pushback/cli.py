@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 
@@ -157,9 +158,11 @@ def cmd_rules(a):
     if a.from_response:
         with open(p["rules_items"], encoding="utf-8") as fh:
             items = json.load(fh)
-        with open(a.from_response, encoding="utf-8") as fh:
-            text = fh.read()
-        raw = json.loads(text[text.find("{"): text.rfind("}") + 1])  # tolerate prose or fences around the JSON
+        raws = []
+        for path in a.from_response:
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+            raws.append(json.loads(text[text.find("{"): text.rfind("}") + 1]))  # tolerate prose or fences
     else:
         if not os.path.exists(p["turns"]):
             sys.exit(f"{p['turns']} not found. Re-run `pushback extract`.")
@@ -184,20 +187,30 @@ def cmd_rules(a):
             print(f"prompt written to {p['rules_prompt']}")
             print("Give it to Claude (for example: ask Claude Code to answer the file), save the JSON reply,")
             print("then run: pushback rules --from-response <reply file>")
+            print("For stable rules, answer it 3 times in fresh sessions and pass all three replies.")
             return
 
         base = os.environ.get("ANTHROPIC_BASE_URL")
-        print(f"Sending them to {base or 'the Anthropic API'} with model {a.model}.")
+        print(f"Sending them to {base or 'the Anthropic API'} with model {a.model}"
+              + (f", {a.runs} times" if a.runs > 1 else "") + ".")
         if not a.yes and input("Continue? [y/N] ").strip().lower() != "y":
             sys.exit("aborted")
         import anthropic
-        raw = rules_mod.ask(anthropic.Anthropic(), request)
+        client = anthropic.Anthropic()
+        raws = [rules_mod.ask(client, request) for _ in range(a.runs)]
 
-    found = rules_mod.parse(raw, items, a.min_support)
+    runs = [rules_mod.parse(raw, items, a.min_support) for raw in raws]
+    if len(runs) == 1:
+        found, unstable = runs[0], []
+    else:
+        min_runs = a.min_runs or max(1, math.ceil(2 * len(runs) / 3))
+        found, unstable = rules_mod.stabilize(runs, min_runs)
     with open(p["rules"], "w", encoding="utf-8") as fh:
-        fh.write(rules_mod.render(found, len(items)))
+        fh.write(rules_mod.render(found, len(items), unstable, {x['id']: x.get('date', '') for x in items}))
     broken = sum(1 for r in found if r["covered_by"])
-    print(f"{len(found)} rules ({broken} you already have but keep breaking) -> {p['rules']}")
+    print(f"{len(found)} rules ({broken} match rules you already have) -> {p['rules']}")
+    if len(runs) > 1:
+        print(f"  kept rules that came back in at least {min_runs} of {len(runs)} runs; {len(unstable)} dropped as unstable")
 
 
 def main(argv=None):
@@ -245,7 +258,9 @@ def main(argv=None):
     ru.add_argument("--model", default=label_mod.DEFAULT_MODEL)
     ru.add_argument("--effort", default="high", choices=["low", "medium", "high"])
     ru.add_argument("--prompt-file", action="store_true", help="write the request to a file instead of calling the API")
-    ru.add_argument("--from-response", help="read the model's JSON reply from this file")
+    ru.add_argument("--from-response", nargs="+", help="read the model's JSON reply (or several, for stability)")
+    ru.add_argument("--runs", type=int, default=1, help="ask N times and keep only rules that keep coming back")
+    ru.add_argument("--min-runs", type=int, help="runs a rule must appear in (default: two thirds of --runs)")
     ru.add_argument("-y", "--yes", action="store_true")
     ru.set_defaults(func=cmd_rules)
 

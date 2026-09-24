@@ -27,7 +27,7 @@ shows what you use your AI coding agent for, how often you correct it on each
 kind of work (code, writing, media, research, ops, meta), and how often a
 correction needs correcting again. It drafts
 **CLAUDE.md rules** from the corrections you keep repeating, shows which of
-your existing rules keep getting broken, and exports your corrections as
+your existing rules those corrections run into, and exports your corrections as
 **preference pairs** (prompt / chosen / rejected). A hand-audit step tells you
 how far to trust every number.
 
@@ -40,7 +40,7 @@ pip install pushback
 The author's own 1,633 messages to Claude Code:
 
 <p align="center">
-  <img src="assets/rates.svg" width="100%" alt="Correction rate by task: media 43.0%, writing 24.7%, research 6.9%, code 5.9%, meta 4.7%, ops 4.5%. One in three corrections needed a second correction. Three existing rules kept getting broken.">
+  <img src="assets/rates.svg" width="100%" alt="Correction rate by task: media 43.0%, writing 24.7%, research 6.9%, code 5.9%, meta 4.7%, ops 4.5%. One in three corrections needed a second correction. One existing rule kept getting broken after it was written.">
 </p>
 
 | task | messages | share of use | corrections | rate | 95% CI | corrected again |
@@ -67,7 +67,7 @@ Most corrected topics (at least 5 messages each):
 
 - Against 91 hand-checked messages the correction labels had **precision 0.97 and recall 0.80**. Topic labels were spot-checked, not audited.
 - **1 in 3 corrections needed a second one.** 70 of 201 fixes got corrected again (35%), 41% on writing and 44% on images.
-- **3 rules the author had already written kept getting broken**, with 6 to 8 corrections each.
+- **1 rule the author had already written kept getting broken**: "images must not look AI-generated" was corrected 3 more times after it was written. Two other matching rules turned out to be written *because of* the corrections, which is why every rule now shows its evidence dates.
 
 > [!NOTE]
 > These rates describe a workflow, not a model. The author's code work runs
@@ -150,17 +150,29 @@ pushback rules                                  # drafts rules into pushback-dat
 pushback rules --existing CLAUDE.md notes/*.md  # also check against the rules you already have
 pushback rules --prompt-file                    # no API key? writes the request to a file instead
 pushback rules --from-response reply.json       # ...and reads Claude's answer back
+pushback rules --runs 3                         # ask 3 times, keep only the rules that keep coming back
 ```
 
 The model groups corrections that share a cause and drafts one CLAUDE.md
 instruction per group. Support is counted from the correction ids it cites,
 not from its own numbers, and a rule needs at least 3 real corrections.
 
+**Stable rules.** A model won't write the same rules twice. With `--runs 3`
+(or three replies passed to `--from-response`), pushback matches rules across
+runs by the corrections they cite, not by their wording, and keeps only the
+ones that come back in at least 2 of 3 runs. Each rule shows how many runs it
+appeared in, and the unstable ones are listed separately instead of vanishing.
+
+On the author's 214 corrections, three independent runs wrote 12, 10 and 7
+rules: 16 distinct rules in total. 5 came back in all three runs, 3 in two,
+and **8 showed up only once**. A single run mixes real rules with one-offs.
+
 When you pass your existing rule files, the output splits in two:
 
-- **Rules you already have that keep getting broken.** These are the useful
-  ones. A rule that exists and still gets corrected isn't working: it's too
-  vague, or the agent doesn't read it at the right moment.
+- **Rules you already have that these corrections hit.** If the corrections
+  came after you wrote the rule, the rule isn't working: it's too vague, or the
+  agent doesn't read it at the right moment. pushback can't know when you wrote
+  a rule, so check the evidence dates.
 - **New rules to consider.** Recurring corrections with no rule behind them.
 
 > [!TIP]
