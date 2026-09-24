@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 (2026-09-24)
+
+- `label --prompt-file` / `label --from-responses`: label without an API key. pushback writes the job as batch files with an INSTRUCTIONS.md for Claude Code, then reads the answers back through the same validation as the API path. Resumable; unanswered or broken batches are reported and stay unlabelled.
+- `--batch-size` now defaults to 40 for the API and 100 for `--prompt-file`.
+
 ## 0.1.1 (2026-09-24)
 
 - Labels now include a **topic**: the specific kind of work, from a fixed list per task (for example code: frontend, cli-tool, database, tests; writing: social-post, client-message, docs-readme). `report` lists your most corrected topics.

@@ -23,6 +23,7 @@ def _paths(data_dir: str) -> dict[str, str]:
         "audit": "audit.jsonl", "silent": "silent.json", "report": "report.md",
         "turns": "turns.jsonl", "dpo": "dpo.jsonl",
         "rules": "rules.md", "rules_items": "rules-items.json", "rules_prompt": "rules-prompt.md",
+        "label_prompts": "label-prompts", "label_responses": "label-responses",
     }.items()}
 
 
@@ -53,12 +54,38 @@ def cmd_extract(a):
 def cmd_label(a):
     p = _paths(a.data)
     messages = list(_load_messages(p["messages"]).values())
+
+    if a.from_responses:
+        r = label_mod.read_responses(p["labels"], p["label_prompts"], p["label_responses"])
+        print(f"{r['answered']} batches read, {r['written']} new labels")
+        if r["incomplete"]:
+            print(f"  {r['incomplete']} messages had no valid label in their batch; they stay unlabelled")
+        if r["broken"]:
+            print(f"  unreadable answers (ask Claude Code to redo them): {', '.join(r['broken'])}")
+        if r["missing"]:
+            print(f"  not answered yet: {len(r['missing'])} batches. Ask Claude Code to finish, then run this again.")
+        return
+
+    if a.prompt_file:
+        n = label_mod.write_prompts(messages, p["labels"], p["label_prompts"], p["label_responses"],
+                                    a.batch_size or 100)  # a file can hold more per batch than one API call
+        if not n:
+            print(f"all {len(messages)} messages already labelled")
+            return
+        instructions = os.path.abspath(os.path.join(p["label_prompts"], "INSTRUCTIONS.md")).replace(os.sep, "/")
+        print(f"{n} batch files written to {p['label_prompts']}/")
+        print("No API key needed. Your messages are still read by Claude, through Claude Code on your subscription.")
+        print("\nIn Claude Code, say:")
+        print(f"  read {instructions} and follow it")
+        print("\nWhen it's done, run: pushback label --from-responses")
+        return
+
     base = os.environ.get("ANTHROPIC_BASE_URL")
     print(f"Sending {len(messages)} messages to {base or 'the Anthropic API'} with model {a.model}.")
     print("Your messages leave this machine for that provider. Check its data policy before using client logs.")
     if not a.yes and input("Continue? [y/N] ").strip().lower() != "y":
         sys.exit("aborted")
-    written, failed = label_mod.run(messages, p["labels"], a.model, a.batch_size, a.workers, a.effort)
+    written, failed = label_mod.run(messages, p["labels"], a.model, a.batch_size or 40, a.workers, a.effort)
     print(f"done: {written} new labels, {failed} failed batches" + (" (re-run to retry them)" if failed else ""))
 
 
@@ -186,9 +213,12 @@ def main(argv=None):
     lb = sub.add_parser("label", help="label each message with Claude (resumable)")
     lb.add_argument("--model", default=label_mod.DEFAULT_MODEL)
     lb.add_argument("--effort", default="low", choices=["low", "medium", "high"])
-    lb.add_argument("--batch-size", type=int, default=40)
+    lb.add_argument("--batch-size", type=int, help="messages per batch (default 40 for the API, 100 for --prompt-file)")
     lb.add_argument("--workers", type=int, default=4)
     lb.add_argument("-y", "--yes", action="store_true", help="skip the data-leaves-your-machine prompt")
+    lb.add_argument("--prompt-file", action="store_true",
+                    help="no API key: write batch files for Claude Code to answer instead of calling the API")
+    lb.add_argument("--from-responses", action="store_true", help="read Claude Code's answers back into labels")
     lb.set_defaults(func=cmd_label)
 
     au = sub.add_parser("audit", help="hand-check a sample so the report can bound the error")

@@ -94,10 +94,20 @@ pushback export             # your corrections as prompt/chosen/rejected pairs
 `ant auth login` profile. It defaults to `claude-opus-5` at low effort; change
 it with `--model`. To send through a gateway, set `ANTHROPIC_BASE_URL`.
 
+> [!TIP]
+> **No API key?** Every step works without one:
+> ```bash
+> pushback label --prompt-file       # writes the labelling job as batch files
+> # in Claude Code: "read <path it prints>/INSTRUCTIONS.md and follow it"
+> pushback label --from-responses    # reads the answers back, with the same checks as the API path
+> ```
+> Your messages are still read by Claude, through Claude Code on your
+> subscription. Unanswered or broken batches are listed and stay unlabelled.
+
 | command | what it does | leaves your machine? |
 |---|---|---|
 | `extract` | pulls the messages you typed, plus full agent turns, out of transcripts | no |
-| `label` | tags each message with a task type and whether it's a correction | yes, to the model provider, after asking |
+| `label` | tags each message with a task, a topic and whether it's a correction | yes: to the API after asking, or through Claude Code with `--prompt-file` |
 | `audit` | shows you a stratified sample to judge by hand | no |
 | `report` | what you use the agent for, how often you correct it per task and per topic (frontend, cli-tool, social-post, ...), how often a fix gets corrected again, with 95% intervals | no |
 | `rules` | groups recurring corrections into CLAUDE.md rules | yes, or no with `--prompt-file` |
@@ -156,6 +166,7 @@ When you pass your existing rule files, the output splits in two:
 > [!TIP]
 > No API key? `--prompt-file` writes the whole request to `rules-prompt.md`.
 > Ask Claude Code to answer it, save the JSON reply, then run `--from-response`.
+> `label` has the same option, so the whole pipeline runs without a key.
 
 ## Export your corrections as preference pairs
 
@@ -197,7 +208,8 @@ answer to pair with.
 - `extract`, `audit`, `report` and `export` never leave your machine. `report` prints counts only.
 - `label` and `rules` send each message, plus the end of the agent reply before
   it, to the model provider. If your logs contain client work, check that
-  provider's data policy first. Both ask before they send anything.
+  provider's data policy first. Both ask before they send anything. With
+  `--prompt-file` nothing is sent by pushback; Claude Code reads the files instead.
 - `pushback-data/` holds your raw messages. It's in `.gitignore`. Keep it there.
 - Your transcripts probably contain other people's information. Keep exports
   local unless every conversation in them is yours to share.
@@ -224,6 +236,11 @@ answer to pair with.
 - Claude Code transcripts only, for now. Codex and Cursor logs are not read yet.
 - Task type is judged from the last agent reply and your message, not the whole session.
 - The rubric was tuned on one person's logs.
+- Labels aren't perfectly stable between runs. Two independent runs on the same
+  60 messages agreed on **correction 93%** of the time, on **task 70%**, and on
+  **topic 76%** when the task matched. Disagreements sit at fuzzy edges
+  (writing vs meta, code vs ops), mostly short "ok do that" messages. Treat
+  small differences between topics as noise.
 
 ## Contributing
 

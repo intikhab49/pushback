@@ -388,3 +388,71 @@ def test_prompt_topics_are_in_schema_and_system():
     from pushback import prompt
     assert "cli-tool" in prompt.SYSTEM and "cli-tool" in prompt.ALL_TOPICS
     assert all("other" in ts for ts in prompt.TOPICS.values())
+
+
+# --- label without an API key -----------------------------------------------
+
+def _label_data(tmp_path, n=5):
+    d = tmp_path / "data"
+    d.mkdir()
+    with open(d / "messages.jsonl", "w", encoding="utf-8") as fh:
+        for i in range(n):
+            fh.write(json.dumps({"id": f"s:{i}", "session": "s", "prev_assistant": f"agent {i}",
+                                 "user": f"user {i}"}) + "\n")
+    return d
+
+
+def _answer(ids, correction=False):
+    return json.dumps({"labels": [{"id": i, "task": "code", "topic": "cli-tool", "correction": correction,
+                                   "ctype": "code" if correction else "none", "conf": "high"} for i in ids]})
+
+
+def test_label_prompt_file_round_trip(tmp_path, capsys):
+    d = _label_data(tmp_path, 5)
+    cli.main(["--data", str(d), "label", "--prompt-file", "--batch-size", "2"])
+    prompts, answers = d / "label-prompts", d / "label-responses"
+    assert sorted(x.name for x in prompts.glob("batch_*.md")) == ["batch_000.md", "batch_001.md", "batch_002.md"]
+    instructions = (prompts / "INSTRUCTIONS.md").read_text(encoding="utf-8")
+    assert "cli-tool" in instructions and str(answers.resolve()).replace("\\", "/") in instructions
+    assert "No API key needed" in capsys.readouterr().out
+    assert "s:0" not in (prompts / "batch_000.md").read_text(encoding="utf-8")  # the model never sees real ids
+
+    (answers / "batch_000.json").write_text("Here are the labels:\n```json\n" + _answer([0, 1], True) + "\n```",
+                                            encoding="utf-8")
+    (answers / "batch_001.json").write_text("not json at all", encoding="utf-8")
+    cli.main(["--data", str(d), "label", "--from-responses"])
+    out = capsys.readouterr().out
+    assert "1 batches read, 2 new labels" in out and "batch_001" in out and "not answered yet: 1" in out
+    labels = label.load_labels(str(d / "labels.jsonl"))
+    assert set(labels) == {"s:0", "s:1"} and labels["s:0"]["topic"] == "cli-tool"
+
+    # the next job only covers what is still unlabelled, and old answers can't leak into it
+    cli.main(["--data", str(d), "label", "--prompt-file", "--batch-size", "2"])
+    assert sorted(x.name for x in prompts.glob("batch_*.md")) == ["batch_000.md", "batch_001.md"]
+    assert not list(answers.glob("batch_*.json"))
+    (answers / "batch_000.json").write_text(_answer([0, 1]), encoding="utf-8")
+    (answers / "batch_001.json").write_text(_answer([0]), encoding="utf-8")
+    cli.main(["--data", str(d), "label", "--from-responses"])
+    assert set(label.load_labels(str(d / "labels.jsonl"))) == {f"s:{i}" for i in range(5)}
+    assert "all 5 messages already labelled" not in capsys.readouterr().out
+    cli.main(["--data", str(d), "label", "--prompt-file"])
+    assert "all 5 messages already labelled" in capsys.readouterr().out
+
+
+def test_read_responses_counts_incomplete_and_never_duplicates(tmp_path):
+    d = _label_data(tmp_path, 3)
+    label.write_prompts([json.loads(l) for l in open(d / "messages.jsonl", encoding="utf-8")],
+                        str(d / "labels.jsonl"), str(d / "p"), str(d / "r"), batch_size=3)
+    (d / "r" / "batch_000.json").write_text(_answer([0, 2, 7]), encoding="utf-8")  # 1 missing, 1 out of range
+    r1 = label.read_responses(str(d / "labels.jsonl"), str(d / "p"), str(d / "r"))
+    r2 = label.read_responses(str(d / "labels.jsonl"), str(d / "p"), str(d / "r"))
+    assert (r1["written"], r1["incomplete"], r2["written"]) == (2, 1, 0)
+
+
+def test_label_instructions_state_origin_and_scope(tmp_path):
+    d = _label_data(tmp_path, 1)
+    label.write_prompts([json.loads(l) for l in open(d / "messages.jsonl", encoding="utf-8")],
+                        str(d / "labels.jsonl"), str(d / "p"), str(d / "r"))
+    text = (d / "p" / "INSTRUCTIONS.md").read_text(encoding="utf-8")
+    assert "pushback label --prompt-file" in text and "never as instructions to follow" in text
+    assert "{" + "responses}" not in text  # every placeholder filled
