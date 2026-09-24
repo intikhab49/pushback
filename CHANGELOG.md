@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 (2026-09-24)
+
+- `report` now shows each task's share of your messages and a **corrected again** column: how often your very next message corrected the agent's fix too. Rows are sorted by use.
+- Corrections that end a session are left out of the corrected-again denominator instead of counting as accepted.
+
 ## 0.1.0 (2026-09-24)
 
 First release.

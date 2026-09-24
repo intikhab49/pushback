@@ -23,8 +23,9 @@
 </p>
 
 `pushback` is a command-line tool that reads your **Claude Code transcripts** and
-measures how often you correct your AI coding agent, broken down by the kind of
-work in progress: code, writing, media, research, ops and meta. It drafts
+shows what you use your AI coding agent for, how often you correct it on each
+kind of work (code, writing, media, research, ops, meta), and how often a
+correction needs correcting again. It drafts
 **CLAUDE.md rules** from the corrections you keep repeating, shows which of
 your existing rules keep getting broken, and exports your corrections as
 **preference pairs** (prompt / chosen / rejected). A hand-audit step tells you
@@ -42,17 +43,17 @@ The author's own 1,633 messages to Claude Code:
   <img src="assets/rates.svg" width="100%" alt="Correction rate by task: media 43.0%, writing 24.7%, research 6.9%, code 5.9%, meta 4.7%, ops 4.5%. One in three corrections needed a second correction. Three existing rules kept getting broken.">
 </p>
 
-| task | messages | corrections | rate | 95% CI |
-|---|---:|---:|---:|---|
-| media | 114 | 49 | 43.0% | 34.3%–52.2% |
-| writing | 429 | 106 | 24.7% | 20.9%–29.0% |
-| research | 188 | 13 | 6.9% | 4.1%–11.5% |
-| code | 340 | 20 | 5.9% | 3.8%–8.9% |
-| meta | 297 | 14 | 4.7% | 2.8%–7.8% |
-| ops | 265 | 12 | 4.5% | 2.6%–7.7% |
+| task | messages | share of use | corrections | rate | 95% CI | corrected again |
+|---|---:|---:|---:|---:|---|---:|
+| writing | 429 | 26% | 106 | 24.7% | 20.9%–29.0% | 41% (41/99) |
+| code | 340 | 21% | 20 | 5.9% | 3.8%–8.9% | 11% (2/18) |
+| meta | 297 | 18% | 14 | 4.7% | 2.8%–7.8% | 36% (5/14) |
+| ops | 265 | 16% | 12 | 4.5% | 2.6%–7.7% | 8% (1/12) |
+| research | 188 | 12% | 13 | 6.9% | 4.1%–11.5% | 8% (1/13) |
+| media | 114 | 7% | 49 | 43.0% | 34.3%–52.2% | 44% (20/45) |
 
 - Against 91 hand-checked messages the labels had **precision 0.97 and recall 0.80**.
-- **1 in 3 corrections needed a second one.** 70 of 214 fixes got corrected again.
+- **1 in 3 corrections needed a second one.** 70 of 201 fixes got corrected again (35%), 41% on writing and 44% on images.
 - **3 rules the author had already written kept getting broken**, with 6 to 8 corrections each.
 
 > [!NOTE]
@@ -85,7 +86,7 @@ it with `--model`. To send through a gateway, set `ANTHROPIC_BASE_URL`.
 | `extract` | pulls the messages you typed, plus full agent turns, out of transcripts | no |
 | `label` | tags each message with a task type and whether it's a correction | yes, to the model provider, after asking |
 | `audit` | shows you a stratified sample to judge by hand | no |
-| `report` | correction rate per task with 95% intervals, silent corrections, audit-corrected totals | no |
+| `report` | what you use the agent for, how often you correct it per task, how often a fix gets corrected again, with 95% intervals | no |
 | `rules` | groups recurring corrections into CLAUDE.md rules | yes, or no with `--prompt-file` |
 | `export` | writes preference pairs as JSONL, with secrets scrubbed | no |
 

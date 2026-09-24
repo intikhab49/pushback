@@ -159,7 +159,8 @@ def test_report_never_contains_message_text():
     }
     aud = {"s:0": {"stratum": "flagged", "human": True}, "s:1": {"stratum": "unflagged", "human": False}}
     text = report.render(report.build(labels, aud, {"rejections": {"edit-code": 1}, "interrupts": {}}))
-    assert "| writing | 1 | 1 | 100.0%" in text
+    assert "| writing | 1 | 50% | 1 | 100.0%" in text
+    assert "| 0% (0/1) |" in text  # s:0's fix was accepted by s:1
     assert "Estimated true corrections: 1" in text
     assert "Fewer than 40 hand checks" in text
     assert "1 rejected tool calls" in text
@@ -343,3 +344,21 @@ def test_rules_render_shortens_session_ids():
     found = [{"rule": "A", "why": "w", "task": "ops", "support": 3,
               "ids": ["163f3d4c-f8a2-4634-8a4a-e36b914c0d0e:18"], "covered_by": ""}]
     assert "Evidence: 163f3d4c:18" in rules.render(found, 3)
+
+
+def test_report_usage_share_and_corrected_again():
+    labels = {
+        "a:0": {"task": "writing", "correction": False, "ctype": "none"},
+        "a:1": {"task": "writing", "correction": True, "ctype": "tone_style"},
+        "a:2": {"task": "writing", "correction": True, "ctype": "tone_style"},   # corrects a:1's fix
+        "a:3": {"task": "writing", "correction": False, "ctype": "none"},        # accepts a:2's fix
+        "b:0": {"task": "code", "correction": True, "ctype": "code"},            # session ends: not counted
+    }
+    r = report.build(labels)
+    writing = next(x for x in r["rows"] if x["task"] == "writing")
+    assert writing["share"] == 0.8 and (writing["again"], writing["again_base"]) == (1, 2)
+    code = next(x for x in r["rows"] if x["task"] == "code")
+    assert code["again_base"] == 0
+    assert r["rows"][0]["task"] == "writing"  # sorted by use
+    text = report.render(r)
+    assert "1 of 2 corrections (50%)" in text and "| code | 1 | 20% | 1 | 100.0% |" in text

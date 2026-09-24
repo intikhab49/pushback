@@ -159,7 +159,7 @@ def rates():
 <text x="64" y="62" class="sans" font-size="28" font-weight="800" fill="{TEXT}">Correction rate by task</text>
 <text x="64" y="90" class="mono" font-size="12" fill="{MUTED}">1,633 MESSAGES · ONE DEVELOPER · BARS = RATE · WHISKERS = 95% CI</text>
 {ticks}{''.join(rows)}
-{stat(860, 118, "1 in 3", CORAL, "corrections needed a second one:", "70 of 214 fixes got corrected again")}
+{stat(860, 118, "1 in 3", CORAL, "corrections needed a second one:", "70 of 201 fixes got corrected again")}
 {stat(860, 256, "3 rules", LIME, "already written, still broken:", "6 to 8 corrections each")}
 <text x="64" y="{H - 30}" class="sans" font-size="14" fill="{MUTED}">These rates describe a workflow, not a model: the code work ran through skills, references, memory, plans and CI first. Writing didn't.</text>"""
     return svg(W, H, "Correction rate by task on the author's 1,633 messages: media 43.0%, writing 24.7%, research 6.9%, "

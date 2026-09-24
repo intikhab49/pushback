@@ -8,13 +8,26 @@ from .prompt import TASKS
 from .stats import corrected_count, wilson
 
 
-def build(labels: dict[int, dict], audit: dict[int, dict] | None = None, silent: dict | None = None) -> dict:
+def _next_id(message_id: str) -> str:
+    session, _, n = message_id.rpartition(":")
+    return f"{session}:{int(n) + 1}"
+
+
+def build(labels: dict[str, dict], audit: dict[str, dict] | None = None, silent: dict | None = None) -> dict:
     total = Counter(d["task"] for d in labels.values())
     corr = Counter(d["task"] for d in labels.values() if d["correction"])
     ctypes = defaultdict(Counter)
-    for d in labels.values():
-        if d["correction"]:
-            ctypes[d["task"]][d["ctype"]] += 1
+    # Corrected again: your very next message corrected the agent's fix too.
+    # Only corrections followed by a labelled message count, so a session that ends on a correction isn't a success.
+    again, again_base = Counter(), Counter()
+    for mid, d in labels.items():
+        if not d["correction"]:
+            continue
+        ctypes[d["task"]][d["ctype"]] += 1
+        nxt = labels.get(_next_id(mid))
+        if nxt is not None:
+            again_base[d["task"]] += 1
+            again[d["task"]] += bool(nxt["correction"])
 
     rows = []
     for task in TASKS:
@@ -22,13 +35,14 @@ def build(labels: dict[int, dict], audit: dict[int, dict] | None = None, silent:
         if not n:
             continue
         lo, hi = wilson(k, n)
-        rows.append({"task": task, "messages": n, "corrections": k, "rate": k / n, "low": lo, "high": hi,
+        rows.append({"task": task, "messages": n, "share": n / len(labels), "corrections": k, "rate": k / n,
+                     "low": lo, "high": hi, "again": again[task], "again_base": again_base[task],
                      "top": ctypes[task].most_common(3)})
-    rows.sort(key=lambda r: r["rate"], reverse=True)
+    rows.sort(key=lambda r: r["messages"], reverse=True)  # what you use the agent for most comes first
 
     flagged = sum(corr.values())
     out = {"messages": len(labels), "flagged": flagged, "rows": rows, "audit": None,
-           "silent": silent or {}}
+           "again": sum(again.values()), "again_base": sum(again_base.values()), "silent": silent or {}}
 
     if audit:
         pos = [a for a in audit.values() if a["stratum"] == "flagged"]
@@ -49,12 +63,17 @@ def render(r: dict) -> str:
     n, f = r["messages"], r["flagged"]
     lines.append(f"{n} messages labelled, {f} flagged as corrections ({f / n:.1%})." if n else "no labels yet")
     lines.append("")
-    lines.append("| task | messages | corrections | rate | 95% CI | most common |")
-    lines.append("|---|---:|---:|---:|---|---|")
+    lines.append("| task | messages | share of use | corrections | rate | 95% CI | corrected again | most common |")
+    lines.append("|---|---:|---:|---:|---:|---|---:|---|")
     for row in r["rows"]:
         top = ", ".join(f"{c} {k}" for c, k in row["top"])
-        lines.append(f"| {row['task']} | {row['messages']} | {row['corrections']} | {row['rate']:.1%} "
-                     f"| {row['low']:.1%}-{row['high']:.1%} | {top} |")
+        again = f"{row['again'] / row['again_base']:.0%} ({row['again']}/{row['again_base']})" if row["again_base"] else "-"
+        lines.append(f"| {row['task']} | {row['messages']} | {row['share']:.0%} | {row['corrections']} | {row['rate']:.1%} "
+                     f"| {row['low']:.1%}-{row['high']:.1%} | {again} | {top} |")
+    if r["again_base"]:
+        lines.append("")
+        lines.append(f"Corrected again: {r['again']} of {r['again_base']} corrections "
+                     f"({r['again'] / r['again_base']:.0%}) were followed by another correction of the fix.")
 
     a = r["audit"]
     lines.append("")
