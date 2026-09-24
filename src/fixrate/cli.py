@@ -12,6 +12,7 @@ from . import export as export_mod
 from . import extract as extract_mod
 from . import label as label_mod
 from . import report as report_mod
+from . import rules as rules_mod
 
 DATA = "fixrate-data"
 
@@ -21,6 +22,7 @@ def _paths(data_dir: str) -> dict[str, str]:
         "messages": "messages.jsonl", "labels": "labels.jsonl",
         "audit": "audit.jsonl", "silent": "silent.json", "report": "report.md",
         "turns": "turns.jsonl", "dpo": "dpo.jsonl",
+        "rules": "rules.md", "rules_items": "rules-items.json", "rules_prompt": "rules-prompt.md",
     }.items()}
 
 
@@ -114,6 +116,63 @@ def cmd_export(a):
     print("This file holds raw agent and user text. It stays on your machine unless you move it.")
 
 
+def _default_existing() -> list[str]:
+    path = os.path.join(os.path.expanduser("~"), ".claude", "CLAUDE.md")
+    return [path] if os.path.exists(path) else []
+
+
+def cmd_rules(a):
+    p = _paths(a.data)
+    labels = label_mod.load_labels(p["labels"])
+    if not labels:
+        sys.exit("no labels yet. Run `fixrate label` first.")
+
+    if a.from_response:
+        with open(p["rules_items"], encoding="utf-8") as fh:
+            items = json.load(fh)
+        with open(a.from_response, encoding="utf-8") as fh:
+            text = fh.read()
+        raw = json.loads(text[text.find("{"): text.rfind("}") + 1])  # tolerate prose or fences around the JSON
+    else:
+        if not os.path.exists(p["turns"]):
+            sys.exit(f"{p['turns']} not found. Re-run `fixrate extract`.")
+        with open(p["turns"], encoding="utf-8") as fh:
+            turns = {t["id"]: t for t in map(json.loads, fh)}
+        items = rules_mod.collect(labels, turns, set(a.task) if a.task else None,
+                                  set(a.ctype) if a.ctype else None, a.limit)
+        if not items:
+            sys.exit("no corrections match those filters.")
+        existing_paths = a.existing if a.existing is not None else _default_existing()
+        existing = "\n".join(open(x, encoding="utf-8", errors="ignore").read() for x in existing_paths)
+        request = rules_mod.build_request(items, existing, a.model, a.effort)
+        with open(p["rules_items"], "w", encoding="utf-8") as fh:
+            json.dump(items, fh, ensure_ascii=False)
+        print(f"{len(items)} corrections, checked against {len(existing_paths)} existing rule file(s)")
+
+        if a.prompt_file:
+            with open(p["rules_prompt"], "w", encoding="utf-8") as fh:
+                fh.write(request["system"] + "\n\n" + request["messages"][0]["content"] + "\n\n"
+                         + "Reply with only a JSON object matching this schema:\n"
+                         + json.dumps(rules_mod.SCHEMA, indent=2) + "\n")
+            print(f"prompt written to {p['rules_prompt']}")
+            print("Give it to Claude (for example: ask Claude Code to answer the file), save the JSON reply,")
+            print("then run: fixrate rules --from-response <reply file>")
+            return
+
+        base = os.environ.get("ANTHROPIC_BASE_URL")
+        print(f"Sending them to {base or 'the Anthropic API'} with model {a.model}.")
+        if not a.yes and input("Continue? [y/N] ").strip().lower() != "y":
+            sys.exit("aborted")
+        import anthropic
+        raw = rules_mod.ask(anthropic.Anthropic(), request)
+
+    found = rules_mod.parse(raw, items, a.min_support)
+    with open(p["rules"], "w", encoding="utf-8") as fh:
+        fh.write(rules_mod.render(found, len(items)))
+    broken = sum(1 for r in found if r["covered_by"])
+    print(f"{len(found)} rules ({broken} you already have but keep breaking) -> {p['rules']}")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="fixrate", description=__doc__)
     ap.add_argument("--data", default=DATA, help=f"working folder (default: ./{DATA})")
@@ -146,6 +205,19 @@ def main(argv=None):
     ex.add_argument("--minimal", action="store_true", help="only prompt/chosen/rejected (TRL DPO columns)")
     ex.add_argument("--out", help="output path (default: <data>/dpo.jsonl)")
     ex.set_defaults(func=cmd_export)
+
+    ru = sub.add_parser("rules", help="draft CLAUDE.md rules from your recurring corrections")
+    ru.add_argument("--task", nargs="*")
+    ru.add_argument("--ctype", nargs="*")
+    ru.add_argument("--limit", type=int, default=400, help="most recent N corrections (default 400)")
+    ru.add_argument("--min-support", type=int, default=3, help="corrections needed per rule (default 3)")
+    ru.add_argument("--existing", nargs="*", help="rule files to check against (default: ~/.claude/CLAUDE.md)")
+    ru.add_argument("--model", default=label_mod.DEFAULT_MODEL)
+    ru.add_argument("--effort", default="high", choices=["low", "medium", "high"])
+    ru.add_argument("--prompt-file", action="store_true", help="write the request to a file instead of calling the API")
+    ru.add_argument("--from-response", help="read the model's JSON reply from this file")
+    ru.add_argument("-y", "--yes", action="store_true")
+    ru.set_defaults(func=cmd_rules)
 
     rp = sub.add_parser("report", help="print the correction-rate table")
     rp.add_argument("--markdown", action="store_true", help="also write report.md")

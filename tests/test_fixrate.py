@@ -257,3 +257,83 @@ def test_export_ctype_filter():
     msgs, labels, turns = _pair_fixture([False, True, False])
     assert export.build_pairs(msgs, labels, turns, ctypes={"wrong_assumption"})[1]["correction type filtered"] == 1
     assert len(export.build_pairs(msgs, labels, turns, ctypes={"tone_style"})[0]) == 1
+
+
+# --- rules ----------------------------------------------------------------
+
+from fixrate import cli, rules
+
+
+def _rules_fixture():
+    labels = {f"s:{i}": {"task": "writing", "correction": i % 2 == 1, "ctype": "tone_style" if i % 2 else "none",
+                         "conf": "high"} for i in range(10)}
+    turns = {f"s:{i}": {"prompt": f"fix {i} " + "c" * 600, "prev_turn": "a" * 900 + f" end{i}"} for i in range(10)}
+    return labels, turns
+
+
+def test_rules_collect_filters_orders_and_truncates():
+    labels, turns = _rules_fixture()
+    items = rules.collect(labels, turns)
+    assert [x["id"] for x in items] == ["s:1", "s:3", "s:5", "s:7", "s:9"]
+    assert len(items[0]["agent"]) == rules.AGENT_CHARS and items[0]["agent"].endswith("end1")
+    assert len(items[0]["correction"]) == rules.CORRECTION_CHARS
+    assert rules.collect(labels, turns, tasks={"code"}) == []
+    assert len(rules.collect(labels, turns, limit=2)) == 2
+
+
+def test_rules_request_includes_existing_rules():
+    labels, turns = _rules_fixture()
+    req = rules.build_request(rules.collect(labels, turns), "- never use tables", "claude-opus-5")
+    assert req["messages"][0]["content"].startswith("EXISTING RULES:\n- never use tables")
+    assert req["output_config"]["format"]["type"] == "json_schema"
+
+
+def test_rules_parse_recounts_support_from_real_ids():
+    items = [{"id": f"s:{i}"} for i in range(5)]
+    raw = {"rules": [
+        {"rule": "Lead with the result", "why": "w", "task": "writing", "ids": [0, 1, 2, 2, 99], "covered_by": ""},
+        {"rule": "Too thin", "why": "w", "task": "writing", "ids": [3, 4], "covered_by": ""},
+        {"rule": "Already a rule", "why": "w", "task": "cooking", "ids": [0, 3, 4], "covered_by": "no tables"},
+        {"rule": "", "why": "w", "task": "writing", "ids": [0, 1, 2], "covered_by": ""},
+    ]}
+    out = rules.parse(raw, items)
+    assert [r["rule"] for r in out] == ["Lead with the result", "Already a rule"]
+    assert out[0]["support"] == 3 and out[0]["ids"] == ["s:0", "s:1", "s:2"]  # duplicate and out-of-range dropped
+    assert out[1]["task"] == "meta"  # unknown task falls back
+
+
+def test_rules_render_separates_broken_rules():
+    found = [
+        {"rule": "A", "why": "w", "task": "writing", "support": 5, "ids": ["s:1"], "covered_by": "no tables"},
+        {"rule": "B", "why": "w", "task": "media", "support": 3, "ids": ["s:2"], "covered_by": ""},
+    ]
+    md = rules.render(found, 40)
+    assert md.index("keep getting broken") < md.index("**A**") < md.index("New rules") < md.index("**B**")
+    assert "No pattern" in rules.render([], 3)
+
+
+def test_rules_cli_round_trip_without_api(tmp_path, capsys):
+    labels, turns = _rules_fixture()
+    d = tmp_path / "data"
+    d.mkdir()
+    with open(d / "labels.jsonl", "w", encoding="utf-8") as fh:
+        for mid, lab in labels.items():
+            fh.write(json.dumps({"id": mid, **lab}) + "\n")
+    with open(d / "turns.jsonl", "w", encoding="utf-8") as fh:
+        for mid, t in turns.items():
+            fh.write(json.dumps({"id": mid, **t}) + "\n")
+    rulefile = tmp_path / "CLAUDE.md"
+    rulefile.write_text("- keep posts short", encoding="utf-8")
+
+    cli.main(["--data", str(d), "rules", "--prompt-file", "--existing", str(rulefile)])
+    prompt = (d / "rules-prompt.md").read_text(encoding="utf-8")
+    assert "EXISTING RULES:\n- keep posts short" in prompt and '"covered_by"' in prompt
+
+    reply = tmp_path / "reply.txt"
+    reply.write_text('Here you go:\n```json\n{"rules": [{"rule": "Keep posts under 80 words", "why": "w", '
+                     '"task": "writing", "ids": [0, 1, 2], "covered_by": "keep posts short"}]}\n```',
+                     encoding="utf-8")
+    cli.main(["--data", str(d), "rules", "--from-response", str(reply)])
+    md = (d / "rules.md").read_text(encoding="utf-8")
+    assert "Keep posts under 80 words" in md and "s:1, s:3, s:5" in md
+    assert "1 rules (1 you already have" in capsys.readouterr().out

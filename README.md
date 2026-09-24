@@ -21,6 +21,11 @@ On the author's own 1,633 messages:
 Against 91 hand-checked messages the labels had precision 0.97 and recall 0.80.
 That's one person's logs. Run it on yours.
 
+These rates describe a workflow, not a model. The author's code work runs
+through skills, reference files, memory and a plan before the agent writes
+anything, and CI catches mistakes before a human has to. Writing got none of
+that. A low rate means the process around the agent is doing its job.
+
 ## Run it
 
 ```
@@ -29,12 +34,36 @@ fixrate extract            # reads ~/.claude/projects, writes ./fixrate-data/
 fixrate label              # sends your messages to Claude, resumable
 fixrate audit              # hand-check 40 messages
 fixrate report --markdown  # the table, with the audit folded in
+fixrate rules              # draft CLAUDE.md rules from your recurring corrections
 fixrate export             # your corrections as prompt/chosen/rejected pairs
 ```
 
 `label` uses the Anthropic SDK, so it picks up `ANTHROPIC_API_KEY` or an
 `ant auth login` profile. It defaults to `claude-opus-5` at low effort. Change
 it with `--model`. To send through a gateway, set `ANTHROPIC_BASE_URL`.
+
+## Turn recurring corrections into rules
+
+```
+fixrate rules                                  # drafts rules into fixrate-data/rules.md
+fixrate rules --existing CLAUDE.md notes/*.md  # also check against the rules you already have
+fixrate rules --prompt-file                    # no API key? writes the request to a file instead
+fixrate rules --from-response reply.json       # ...and reads Claude's answer back
+```
+
+The model groups corrections that share a cause and drafts one CLAUDE.md
+instruction per group. Support is counted from the correction ids it cites,
+not from its own numbers, and a rule needs at least 3 real corrections.
+
+When you pass your existing rule files, the output splits in two:
+
+- **Rules you already have that keep getting broken.** These are the useful
+  ones. A rule that exists and still gets corrected isn't working: it's too
+  vague, or the agent doesn't read it at the right moment.
+- **New rules to consider.** Recurring corrections with no rule behind them.
+
+No API key: `--prompt-file` writes the whole request to `rules-prompt.md`.
+Ask Claude Code to answer it, save the JSON reply, then run `--from-response`.
 
 ## Export your corrections as preference pairs
 
