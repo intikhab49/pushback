@@ -1,8 +1,8 @@
-# fixrate
+# pushback
 
 How often do you correct your coding agent, and on what kind of work?
 
-`fixrate` reads your Claude Code transcripts, labels every message you sent
+`pushback` reads your Claude Code transcripts, labels every message you sent
 with Claude, and tells you what share of your messages were corrections,
 broken down by the kind of work in progress (code, writing, media, research,
 ops, meta). A hand-check step tells you how far to trust the labels.
@@ -30,12 +30,12 @@ that. A low rate means the process around the agent is doing its job.
 
 ```
 pip install -e .
-fixrate extract            # reads ~/.claude/projects, writes ./fixrate-data/
-fixrate label              # sends your messages to Claude, resumable
-fixrate audit              # hand-check 40 messages
-fixrate report --markdown  # the table, with the audit folded in
-fixrate rules              # draft CLAUDE.md rules from your recurring corrections
-fixrate export             # your corrections as prompt/chosen/rejected pairs
+pushback extract            # reads ~/.claude/projects, writes ./pushback-data/
+pushback label              # sends your messages to Claude, resumable
+pushback audit              # hand-check 40 messages
+pushback report --markdown  # the table, with the audit folded in
+pushback rules              # draft CLAUDE.md rules from your recurring corrections
+pushback export             # your corrections as prompt/chosen/rejected pairs
 ```
 
 `label` uses the Anthropic SDK, so it picks up `ANTHROPIC_API_KEY` or an
@@ -45,10 +45,10 @@ it with `--model`. To send through a gateway, set `ANTHROPIC_BASE_URL`.
 ## Turn recurring corrections into rules
 
 ```
-fixrate rules                                  # drafts rules into fixrate-data/rules.md
-fixrate rules --existing CLAUDE.md notes/*.md  # also check against the rules you already have
-fixrate rules --prompt-file                    # no API key? writes the request to a file instead
-fixrate rules --from-response reply.json       # ...and reads Claude's answer back
+pushback rules                                  # drafts rules into pushback-data/rules.md
+pushback rules --existing CLAUDE.md notes/*.md  # also check against the rules you already have
+pushback rules --prompt-file                    # no API key? writes the request to a file instead
+pushback rules --from-response reply.json       # ...and reads Claude's answer back
 ```
 
 The model groups corrections that share a cause and drafts one CLAUDE.md
@@ -68,9 +68,9 @@ Ask Claude Code to answer it, save the JSON reply, then run `--from-response`.
 ## Export your corrections as preference pairs
 
 ```
-fixrate export                                        # all pairs -> fixrate-data/dpo.jsonl
-fixrate export --ctype writing_content tone_style     # the cleanest pairs
-fixrate export --minimal                              # only prompt/chosen/rejected (TRL DPO columns)
+pushback export                                        # all pairs -> pushback-data/dpo.jsonl
+pushback export --ctype writing_content tone_style     # the cleanest pairs
+pushback export --minimal                              # only prompt/chosen/rejected (TRL DPO columns)
 ```
 
 Each correction you made becomes one row:
@@ -105,7 +105,7 @@ What to know before you train on it:
 A message where you reject, fix or redirect something the agent just did,
 said, wrote or proposed. New tasks, answers to its questions, picking between
 its options, approvals and pasted logs don't count. The full rubric is in
-`src/fixrate/prompt.py`. If you change it, run `audit` again.
+`src/pushback/prompt.py`. If you change it, run `audit` again.
 
 Rejected tool calls and interrupts carry no text, so they're counted
 separately and bucketed by the action you stopped (a code edit, a shell
@@ -117,7 +117,7 @@ command, and so on).
 - `label` sends each message, plus the end of the agent reply before it, to the
   model provider. If your logs contain client work, check that provider's data
   policy first. `label` asks before it sends anything.
-- `fixrate-data/` holds your raw messages. It's in `.gitignore`. Keep it there.
+- `pushback-data/` holds your raw messages. It's in `.gitignore`. Keep it there.
 
 ## Your history is shorter than you think
 

@@ -1,5 +1,5 @@
 # Your raw messages live here. Never commit it.
-fixrate-data/
+pushback-data/
 __pycache__/
 *.egg-info/
 .pytest_cache/

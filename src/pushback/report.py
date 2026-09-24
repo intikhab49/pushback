@@ -59,7 +59,7 @@ def render(r: dict) -> str:
     a = r["audit"]
     lines.append("")
     if not a:
-        lines.append("No audit yet: these are raw model labels. Run `fixrate audit` before quoting any number.")
+        lines.append("No audit yet: these are raw model labels. Run `pushback audit` before quoting any number.")
     elif a["estimate"] is None:
         lines.append(f"Audit has {a['n']} answers but needs both flagged and unflagged samples.")
     else:

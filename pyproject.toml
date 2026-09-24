@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fixrate"
+name = "pushback"
 version = "0.1.0"
 description = "How often do you correct your coding agent, and at what kind of work? Measured from your own Claude Code transcripts."
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = ["anthropic>=1.0"]
 test = ["pytest>=8"]
 
 [project.scripts]
-fixrate = "fixrate.cli:main"
+pushback = "pushback.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,4 +1,4 @@
-"""fixrate: how often do you correct your coding agent, and at what kind of work?"""
+"""pushback: how often do you correct your coding agent, and at what kind of work?"""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from . import label as label_mod
 from . import report as report_mod
 from . import rules as rules_mod
 
-DATA = "fixrate-data"
+DATA = "pushback-data"
 
 
 def _paths(data_dir: str) -> dict[str, str]:
@@ -28,7 +28,7 @@ def _paths(data_dir: str) -> dict[str, str]:
 
 def _load_messages(path: str) -> dict[str, dict]:
     if not os.path.exists(path):
-        sys.exit(f"{path} not found. Run `fixrate extract` first.")
+        sys.exit(f"{path} not found. Run `pushback extract` first.")
     with open(path, encoding="utf-8") as fh:
         return {m["id"]: m for m in map(json.loads, fh) if m}
 
@@ -67,7 +67,7 @@ def cmd_audit(a):
     messages = _load_messages(p["messages"])
     labels = label_mod.load_labels(p["labels"])
     if not labels:
-        sys.exit("no labels yet. Run `fixrate label` first.")
+        sys.exit("no labels yet. Run `pushback label` first.")
     n = audit_mod.run(messages, labels, p["audit"], a.n, a.seed)
     print(f"\nsaved {n} answers to {p['audit']}")
 
@@ -76,7 +76,7 @@ def cmd_report(a):
     p = _paths(a.data)
     labels = label_mod.load_labels(p["labels"])
     if not labels:
-        sys.exit("no labels yet. Run `fixrate label` first.")
+        sys.exit("no labels yet. Run `pushback label` first.")
     silent = json.load(open(p["silent"], encoding="utf-8")) if os.path.exists(p["silent"]) else None
     text = report_mod.render(report_mod.build(labels, audit_mod.load_audit(p["audit"]), silent))
     print(text)
@@ -91,9 +91,9 @@ def cmd_export(a):
     messages = list(_load_messages(p["messages"]).values())
     labels = label_mod.load_labels(p["labels"])
     if not labels:
-        sys.exit("no labels yet. Run `fixrate label` first.")
+        sys.exit("no labels yet. Run `pushback label` first.")
     if not os.path.exists(p["turns"]):
-        sys.exit(f"{p['turns']} not found. Re-run `fixrate extract` (it now saves full agent turns).")
+        sys.exit(f"{p['turns']} not found. Re-run `pushback extract` (it now saves full agent turns).")
     with open(p["turns"], encoding="utf-8") as fh:
         turns = {t["id"]: t for t in map(json.loads, fh)}
     pairs, skipped = export_mod.build_pairs(
@@ -125,7 +125,7 @@ def cmd_rules(a):
     p = _paths(a.data)
     labels = label_mod.load_labels(p["labels"])
     if not labels:
-        sys.exit("no labels yet. Run `fixrate label` first.")
+        sys.exit("no labels yet. Run `pushback label` first.")
 
     if a.from_response:
         with open(p["rules_items"], encoding="utf-8") as fh:
@@ -135,7 +135,7 @@ def cmd_rules(a):
         raw = json.loads(text[text.find("{"): text.rfind("}") + 1])  # tolerate prose or fences around the JSON
     else:
         if not os.path.exists(p["turns"]):
-            sys.exit(f"{p['turns']} not found. Re-run `fixrate extract`.")
+            sys.exit(f"{p['turns']} not found. Re-run `pushback extract`.")
         with open(p["turns"], encoding="utf-8") as fh:
             turns = {t["id"]: t for t in map(json.loads, fh)}
         items = rules_mod.collect(labels, turns, set(a.task) if a.task else None,
@@ -156,7 +156,7 @@ def cmd_rules(a):
                          + json.dumps(rules_mod.SCHEMA, indent=2) + "\n")
             print(f"prompt written to {p['rules_prompt']}")
             print("Give it to Claude (for example: ask Claude Code to answer the file), save the JSON reply,")
-            print("then run: fixrate rules --from-response <reply file>")
+            print("then run: pushback rules --from-response <reply file>")
             return
 
         base = os.environ.get("ANTHROPIC_BASE_URL")
@@ -174,7 +174,7 @@ def cmd_rules(a):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="fixrate", description=__doc__)
+    ap = argparse.ArgumentParser(prog="pushback", description=__doc__)
     ap.add_argument("--data", default=DATA, help=f"working folder (default: ./{DATA})")
     sub = ap.add_subparsers(dest="cmd", required=True)
 

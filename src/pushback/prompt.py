@@ -1,7 +1,7 @@
 """The labelling instructions and the JSON schema the model must answer in.
 
 These are the instructions that scored precision 0.97 / recall 0.80 against 91
-hand labels on the author's own logs. Change them and re-run `fixrate audit`
+hand labels on the author's own logs. Change them and re-run `pushback audit`
 before trusting new numbers.
 """
 

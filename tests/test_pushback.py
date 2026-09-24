@@ -3,7 +3,7 @@ import types
 
 import pytest
 
-from fixrate import audit, extract, label, report, stats
+from pushback import audit, extract, label, report, stats
 
 
 def _write_session(tmp_path, name, entries):
@@ -172,7 +172,7 @@ def test_report_without_audit_warns():
 
 # --- turns + export -------------------------------------------------------
 
-from fixrate import export
+from pushback import export
 
 
 def test_extract_captures_full_multi_block_turns(tmp_path):
@@ -261,7 +261,7 @@ def test_export_ctype_filter():
 
 # --- rules ----------------------------------------------------------------
 
-from fixrate import cli, rules
+from pushback import cli, rules
 
 
 def _rules_fixture():
