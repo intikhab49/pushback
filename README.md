@@ -29,7 +29,7 @@ that. A low rate means the process around the agent is doing its job.
 ## Run it
 
 ```
-pip install -e .
+pip install pushback          # or, from a clone: pip install -e .
 pushback extract            # reads ~/.claude/projects, writes ./pushback-data/
 pushback label              # sends your messages to Claude, resumable
 pushback audit              # hand-check 40 messages
