@@ -29,11 +29,47 @@ fixrate extract            # reads ~/.claude/projects, writes ./fixrate-data/
 fixrate label              # sends your messages to Claude, resumable
 fixrate audit              # hand-check 40 messages
 fixrate report --markdown  # the table, with the audit folded in
+fixrate export             # your corrections as prompt/chosen/rejected pairs
 ```
 
 `label` uses the Anthropic SDK, so it picks up `ANTHROPIC_API_KEY` or an
 `ant auth login` profile. It defaults to `claude-opus-5` at low effort. Change
 it with `--model`. To send through a gateway, set `ANTHROPIC_BASE_URL`.
+
+## Export your corrections as preference pairs
+
+```
+fixrate export                                        # all pairs -> fixrate-data/dpo.jsonl
+fixrate export --ctype writing_content tone_style     # the cleanest pairs
+fixrate export --minimal                              # only prompt/chosen/rejected (TRL DPO columns)
+```
+
+Each correction you made becomes one row:
+
+- `prompt`: your message the agent was answering
+- `rejected`: the agent turn you corrected
+- `chosen`: the agent's reply to your correction, kept only if your next message wasn't another correction
+- `feedback`: the correction itself, for critique-and-revise formats
+
+On the author's logs, 214 corrections gave 124 pairs. The biggest loss:
+70 corrections (a third) had their fix corrected too, so there was no
+accepted answer to pair with.
+
+What to know before you train on it:
+
+- "You didn't correct it again" is weak evidence that the fix was good.
+- The fix was written after seeing your feedback. For corrections of a wrong
+  assumption ("I already sent that"), `chosen` answers the correction rather
+  than the prompt. Those make poor DPO pairs, so filter with `--ctype`.
+- Only agent text is exported. File edits and commands are tool calls, so a
+  code correction's pair may hold the explanation without the diff. Use
+  `--max-tools` to drop tool-heavy turns.
+- Secrets are scrubbed on a best-effort basis (API key shapes, tokens,
+  `NAME_KEY=value`). Read the file before you use it.
+- Your transcripts probably contain other people's information. Keep the
+  export local unless every conversation in it is yours to share.
+- If the agent is Claude, Anthropic's terms restrict using its outputs to
+  build competing models. Treat this as a personal dataset or eval set.
 
 ## What counts as a correction
 

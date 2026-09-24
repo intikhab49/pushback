@@ -168,3 +168,92 @@ def test_report_never_contains_message_text():
 def test_report_without_audit_warns():
     labels = {"s:0": {"task": "code", "correction": False, "ctype": "none"}}
     assert "No audit yet" in report.render(report.build(labels))
+
+
+# --- turns + export -------------------------------------------------------
+
+from fixrate import export
+
+
+def test_extract_captures_full_multi_block_turns(tmp_path):
+    long_reply = "x" * 900
+    _write_session(tmp_path, "sess", [
+        _user("draft the post"),
+        _asst("First part."),
+        _asst(long_reply, tool=("t9", "Write", {"file_path": "post.md"})),
+        _user("no, too long"),
+    ])
+    ex = extract.extract(str(tmp_path))
+    turn = ex.turns["sess:1"]
+    assert turn["prompt"] == "no, too long"
+    assert turn["prev_turn"] == "First part.\n\n" + long_reply  # nothing truncated
+    assert turn["prev_turn_tools"] == 1
+    assert ex.turns["sess:0"]["prev_turn"] == ""
+
+
+def _pair_fixture(verdicts):
+    """Session s: 0 ask, 1 correction, 2 reaction to the new reply (+ more)."""
+    msgs = [{"id": f"s:{i}"} for i in range(len(verdicts))]
+    labels = {f"s:{i}": {"task": "writing", "correction": v, "ctype": "tone_style" if v else "none",
+                         "conf": "high"} for i, v in enumerate(verdicts) if v is not None}
+    turns = {f"s:{i}": {"prompt": f"user {i}", "prev_turn": f"agent before {i}", "prev_turn_tools": 0}
+             for i in range(len(verdicts))}
+    return msgs, labels, turns
+
+
+def test_export_builds_pair_from_accepted_fix():
+    msgs, labels, turns = _pair_fixture([False, True, False])
+    pairs, skipped = export.build_pairs(msgs, labels, turns)
+    assert len(pairs) == 1
+    p = pairs[0]
+    assert p["prompt"] == "user 0"          # what the agent was answering
+    assert p["rejected"] == "agent before 1"  # the turn that got corrected
+    assert p["feedback"] == "user 1"        # the correction
+    assert p["chosen"] == "agent before 2"    # the reply to the correction
+
+
+def test_export_skips_when_fix_was_also_corrected():
+    msgs, labels, turns = _pair_fixture([False, True, True])
+    pairs, skipped = export.build_pairs(msgs, labels, turns)
+    # message 1's fix was rejected; message 2 has no reaction after it
+    assert pairs == []
+    assert skipped["new reply was corrected too"] == 1
+    assert skipped["session ended after correction"] == 1
+
+
+def test_export_skips_edges_and_unlabelled_reactions():
+    msgs, labels, turns = _pair_fixture([True, False])
+    pairs, skipped = export.build_pairs(msgs, labels, turns)
+    assert skipped["no earlier message"] == 1 and not pairs
+    msgs, labels, turns = _pair_fixture([False, True, None])
+    pairs, skipped = export.build_pairs(msgs, labels, turns)
+    assert skipped["reaction not labelled"] == 1 and not pairs
+
+
+def test_export_filters():
+    msgs, labels, turns = _pair_fixture([False, True, False])
+    turns["s:2"]["prev_turn_tools"] = 9
+    assert export.build_pairs(msgs, labels, turns, max_tools=3)[1]["too many tool calls"] == 1
+    assert export.build_pairs(msgs, labels, turns, tasks={"code"})[1]["task filtered"] == 1
+    labels["s:1"]["conf"] = "low"
+    assert export.build_pairs(msgs, labels, turns, high_only=True)[1]["low confidence"] == 1
+
+
+def test_redact_common_secrets():
+    text = ("key sk-ant-api03-" + "a" * 30 + " and ghp_" + "b" * 36 + " and AKIA" + "C" * 16
+            + " Bearer " + "d" * 30)
+    clean, n = export.redact(text)
+    assert n == 4 and "sk-ant" not in clean and "ghp_" not in clean and "AKIA" not in clean
+    assert export.redact("nothing secret here")[1] == 0
+
+
+def test_redact_assignments_keeps_name_and_spares_placeholders():
+    clean, n = export.redact("$env:XI_API_KEY='" + "Q" * 32 + "'")
+    assert n == 1 and clean == "$env:XI_API_KEY='[REDACTED]'"
+    assert export.redact("XI_API_KEY=your-key-here")[1] == 0
+
+
+def test_export_ctype_filter():
+    msgs, labels, turns = _pair_fixture([False, True, False])
+    assert export.build_pairs(msgs, labels, turns, ctypes={"wrong_assumption"})[1]["correction type filtered"] == 1
+    assert len(export.build_pairs(msgs, labels, turns, ctypes={"tone_style"})[0]) == 1

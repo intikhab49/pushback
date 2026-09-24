@@ -31,6 +31,8 @@ class Extracted:
     messages: list[dict] = field(default_factory=list)
     rejections: Counter = field(default_factory=Counter)
     interrupts: Counter = field(default_factory=Counter)
+    # Full text for `export`: the whole agent turn before each message, and the untruncated message.
+    turns: dict[str, dict] = field(default_factory=dict)
     sessions: int = 0
 
 
@@ -82,6 +84,9 @@ def _extract_file(path, session, out, max_user_chars, max_context_chars):
     n = 0
     tools: dict[str, tuple[str, dict]] = {}
     last_tool: tuple[str, dict] | None = None
+    # One agent turn = every text block and tool call between two human messages.
+    turn_text: list[str] = []
+    turn_tools = 0
     with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             try:
@@ -97,8 +102,10 @@ def _extract_file(path, session, out, max_user_chars, max_context_chars):
                 text = " ".join(b.get("text", "") for b in content if b.get("type") == "text").strip()
                 if text:
                     last_text = text
+                    turn_text.append(text)
                 for b in content:
                     if b.get("type") == "tool_use":
+                        turn_tools += 1
                         tools[b.get("id")] = (b.get("name", ""), b.get("input"))
                         last_tool = tools[b.get("id")]
                 continue
@@ -131,4 +138,10 @@ def _extract_file(path, session, out, max_user_chars, max_context_chars):
                     "prev_assistant": last_text[-max_context_chars:].replace("\n", " "),
                     "user": text[:max_user_chars].replace("\n", " "),
                 })
+                out.turns[f"{session}:{n}"] = {
+                    "prompt": text,
+                    "prev_turn": "\n\n".join(turn_text),
+                    "prev_turn_tools": turn_tools,
+                }
+                turn_text, turn_tools = [], 0
                 n += 1
